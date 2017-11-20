@@ -1,0 +1,1 @@
+sample_int:INTEGER,sample_timestamp:TIMESTAMP,sample_string:STRING,sample_date:DATE
