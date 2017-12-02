@@ -28,4 +28,12 @@ Now, you need to create the service account that is going to be used by the span
 
 ## <a name="usage"></a>4. Usage
 
+Install the requirements for the python script by executing the following command
+```bash
+pip install -r requrements.txt
+```
 
+Execute the spanner-loader python script with the required arguments.
+```bash
+python spanner-loader.py --project_id=[Your Google Cloud Project id] --path_to_credentials=[Path to the json file with the credentials] --instance_id=[Your Cloud Spanner instance ID] --database_id=[Your Cloud Spanner database ID] --table_id=[Your table name] --batchsize=[The number of rows to insert in a batch] --bucket_name=[The name of the bucket for the source file] --file_name=[The csv input data file] --schema_file=[The format file describing the input data file]
+```
