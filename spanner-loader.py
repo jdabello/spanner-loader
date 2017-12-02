@@ -88,7 +88,7 @@ if __name__ == '__main__':
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
-        '--project_id', help='Your Cloud Spanner project ID.')
+        '--project_id', help='Your Google Cloud Platform project ID.')
     parser.add_argument(
         '--path_to_credentials', help='Path to the json file with the credentials.')
     parser.add_argument(
