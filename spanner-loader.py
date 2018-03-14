@@ -69,7 +69,7 @@ def load_file(project_id,path_to_credentials,instance_id,database_id,table_id, b
 					row[x] = row[x]
 				if 'DATE' in typelist[x]:
 					row[x] = get_date(row[x])
-					alist.append(row)
+			alist.append(row)
 			irows=irows+1
 			if(irows>=int(batchsize)):
 				with database.batch() as batch:
