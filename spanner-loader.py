@@ -87,28 +87,60 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
+
     parser.add_argument(
-        '--project_id', help='Your Google Cloud Platform project ID.')
+        '--project_id',
+        help='Your Google Cloud Platform project ID.'
+    )
+
     parser.add_argument(
-        '--path_to_credentials', help='Path to the json file with the credentials.')
+        '--path_to_credentials',
+        help='Path to the json file with the credentials.'
+    )
+
     parser.add_argument(
-        '--instance_id', help='Your Cloud Spanner instance ID.')
+        '--instance_id',
+        help='Your Cloud Spanner instance ID.'
+    )
+
     parser.add_argument(
-        '--database_id', help='Your Cloud Spanner database ID.')
+        '--database_id',
+        help='Your Cloud Spanner database ID.'
+    )
+
     parser.add_argument(
-    	'--table_id', help='Your table name')
+        '--table_id',
+        help='Your table name'
+    )
+
     parser.add_argument(
-		'--batchsize', help='The number of rows to insert in a batch')
+		'--batchsize',
+        help='The number of rows to insert in a batch'
+    )
+
     parser.add_argument(
-		'--bucket_name', help='The name of the bucket for the source file')
+		'--bucket_name',
+        help='The name of the bucket for the source file'
+    )
+
     parser.add_argument(
-		'--file_name', help='The csv input data file')
+		'--file_name',
+        help='The csv input data file'
+    )
+
     parser.add_argument(
-    	'--schema_file', help='The format file describing the input data file')
-		
+        '--schema_file',
+        help='The format file describing the input data file'
+    )
+
     args = parser.parse_args()
 
-    load_file(args.project_id,args.path_to_credentials,args.instance_id,args.database_id,args.table_id,args.batchsize,args.bucket_name,args.file_name,args.schema_file)
-
-
-
+    load_file(args.project_id,
+              args.path_to_credentials,
+              args.instance_id,
+              args.database_id,
+              args.table_id,
+              args.batchsize,
+              args.bucket_name,
+              args.file_name,
+              args.schema_file)
