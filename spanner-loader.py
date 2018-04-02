@@ -1,9 +1,19 @@
+import re
 import csv
 import gzip
 import codecs
 import argparse
 from google.oauth2 import service_account
 from google.cloud import storage, spanner
+
+apply_type = {
+    'INTEGER': lambda x: int(x),
+    'INT64': lambda x: int(x),
+    'FLOAT64': lambda x: float(x),
+    'TIMESTAMP': lambda x: get_timestamp_with_nanoseconds(x),
+    'STRING': lambda x: str(x),
+    'DATE': lambda x: get_date(x)
+}
 
 def unescaped_str(arg_str):
     return codecs.decode(str(arg_str), 'unicode_escape')
@@ -20,17 +30,19 @@ def download_blob(bucket_name, source_blob_name, destination_file_name):
         source_blob_name,
         destination_file_name))
 
-def parse_schema(schema):
-    with open(schema, 'r') as schema:
-        columns = schema.read().split(",")
-        typelist = []
-        collist = []
-        for column in columns:
-            column_details = column.split(":")
-            collist.append(column_details[0])
-            typelist.append(column_details[1])
+def parse_schema(schema_file):
+    """ Parse a local comma separated schema file and return a dict mapping of
+    column name -> column type """
 
-    return collist, typelist
+    with open(schema_file, 'r') as schema:
+        col_mapping = {}
+        columns = schema.read().split(",")
+        for column in columns:
+            column = re.sub(r'[\n\t\s]*', '', column)
+            col_name, col_type = column.split(":")
+            col_mapping[col_name] = col_type
+
+    return col_mapping
 
 def get_timestamp_with_nanoseconds(timestamp_string):
     from google.cloud.spanner_v1._helpers import TimestampWithNanoseconds
@@ -74,39 +86,40 @@ def load_file(instance_id,
 
     download_blob(bucket_name, file_name, 'source_file.gz')
 
-    collist, typelist = parse_schema(schema_file)
-    numcols = len(typelist)
+    col_mapping = parse_schema(schema_file=schema_file)
+    col_list = col_mapping.keys()
 
     print('Detected {} columns in schema: {}'
-          .format(numcols, collist))
+          .format(len(col_mapping), col_list))
 
-    with gzip.open("source_file.gz", "rt") as file:
-        reader = csv.reader(file, delimiter=delimiter)
-        alist = []
-        irows = 0
+    with gzip.open("source_file.gz", "rt") as source_file:
+        reader = csv.DictReader(source_file,
+                                delimiter=delimiter,
+                                fieldnames=col_list)
+        row_batch = []
+        row_cnt = 0
+
         for row in reader:
-            for x in range(0, numcols):
-                if 'INTEGER' in typelist[x]:
-                    row[x] = int(row[x])
-                if 'TIMESTAMP' in typelist[x]:
-                    row[x] = get_timestamp_with_nanoseconds(row[x])
-                if 'STRING' in typelist[x]:
-                    row[x] = row[x]
-                if 'DATE' in typelist[x]:
-                    row[x] = get_date(row[x])
-            alist.append(row)
-            irows=irows+1
+            target_row = []
+            for col_name, col_value in row.items():
+                print('Processing column: {} = {}'
+                      .format(col_name, col_value))
+                target_row.append(apply_type[col_mapping[col_name]](col_value))
 
-            if(irows>=int(batchsize)):
+            row_batch.append(target_row)
+            row_cnt += 1
+
+            if row_cnt >= batchsize:
+                print(row_batch)
                 with database.batch() as batch:
                   batch.insert(
                       table=table_id,
-                      columns=collist,
-                      values=alist
+                      columns=col_list,
+                      values=row_batch
                   )
-                print('inserted {} rows'.format(irows))
-                irows=0
-                alist = []
+                print('inserted {} rows'.format(row_cnt))
+                row_cnt = 0
+                insert_rows = []
 
 
 if __name__ == '__main__':
