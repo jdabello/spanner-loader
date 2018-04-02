@@ -30,7 +30,7 @@ Now, you need to create the service account that is going to be used by the span
 
 Install the requirements for the python script by executing the following command
 ```bash
-pip install -r requrements.txt
+pip install -r requirements.txt
 ```
 
 Execute the spanner-loader python script with the required arguments.
