@@ -106,8 +106,9 @@ def load_file(instance_id,
         for row in reader:
             target_row = []
             for col_name, col_value in row.items():
-                print('Processing column: {} = {}'
-                      .format(col_name, col_value))
+                logging.info('Processing column: {} = {}'
+                             .format(col_name, col_value))
+
                 target_row.append(apply_type[col_mapping[col_name]](col_value))
 
             row_batch.append(target_row)
@@ -119,7 +120,8 @@ def load_file(instance_id,
                       batch.insert(
                           table=table_id,
                           columns=col_list,
-                          values=row_batch)
+                          values=row_batch
+                      )
 
                     print('Inserted {} rows into table {}'
                           .format(row_cnt, table_id))
