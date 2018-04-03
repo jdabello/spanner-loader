@@ -1,6 +1,7 @@
 import re
 import csv
 import gzip
+import uuid
 import codecs
 import argparse
 import logging
@@ -91,7 +92,7 @@ def load_file(instance_id,
     download_blob(bucket_name, file_name, 'source_file.gz')
 
     col_mapping = parse_schema(schema_file=schema_file)
-    col_list = col_mapping.keys()
+    col_list = list(col_mapping.keys())
 
     print('Detected {} columns in schema: {}'
           .format(len(col_mapping), col_list))
@@ -105,6 +106,8 @@ def load_file(instance_id,
 
         for row in reader:
             target_row = []
+            target_row.append(str(uuid.uuid4()))
+
             for col_name, col_value in row.items():
                 logging.info('Processing column: {} = {}'
                              .format(col_name, col_value))
@@ -119,7 +122,7 @@ def load_file(instance_id,
                     with database.batch() as batch:
                       batch.insert(
                           table=table_id,
-                          columns=col_list,
+                          columns=['uuid'] + col_list,
                           values=row_batch
                       )
 
@@ -130,7 +133,7 @@ def load_file(instance_id,
                           .format(row_batch))
 
                 row_cnt = 0
-                insert_rows = []
+                row_batch = []
 
 
 if __name__ == '__main__':
