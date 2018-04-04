@@ -74,6 +74,7 @@ def load_file(instance_id,
               dry_run,
               verbose,
               debug,
+              add_uuid,
               project_id=None,
               path_to_credentials=None):
 
@@ -92,21 +93,29 @@ def load_file(instance_id,
     download_blob(bucket_name, file_name, 'source_file.gz')
 
     col_mapping = parse_schema(schema_file=schema_file)
-    col_list = list(col_mapping.keys())
 
-    print('Detected {} columns in schema: {}'
-          .format(len(col_mapping), col_list))
+    src_col = list(col_mapping.keys())
+
+    if add_uuid:
+        target_col = ['uuid'] + src_col
+    else:
+        target_col = src_col
+
+    print('Detected {} columns in source schema: {}'
+          .format(len(col_mapping), src_col))
 
     with gzip.open("source_file.gz", "rt") as source_file:
         reader = csv.DictReader(source_file,
                                 delimiter=delimiter,
-                                fieldnames=col_list)
+                                fieldnames=src_col)
         row_batch = []
         row_cnt = 0
 
         for row in reader:
             target_row = []
-            target_row.append(str(uuid.uuid4()))
+
+            if add_uuid:
+                target_row.append(str(uuid.uuid4()))
 
             for col_name, col_value in row.items():
                 logging.info('Processing column: {} = {}'
@@ -122,7 +131,7 @@ def load_file(instance_id,
                     with database.batch() as batch:
                       batch.insert(
                           table=table_id,
-                          columns=['uuid'] + col_list,
+                          columns=target_col,
                           values=row_batch
                       )
 
@@ -161,6 +170,13 @@ if __name__ == '__main__':
         default=False,
         action='store_true',
         help='Perform dry-run without actually inserting rows'
+    )
+
+    parser.add_argument(
+        '--add-uuid',
+        default=False,
+        action='store_true',
+        help='Add a uuid column to target row'
     )
 
     parser.add_argument(
