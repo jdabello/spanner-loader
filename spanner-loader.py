@@ -130,7 +130,9 @@ def load_file(instance_id,
             target_row = []
             skip_row = False
 
-            print('Processing row {}'.format(row_cnt), end='\r')
+            logging.info('Processing source row = {}'.format(row))
+
+            print('Processing row {:,}'.format(row_cnt), end='\r')
 
             if add_uuid:
                 target_row.append(str(uuid.uuid4()))
