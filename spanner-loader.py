@@ -127,17 +127,18 @@ def load_file(instance_id,
         row_batch = []
 
         for row in reader:
-            target_row = []
             skip_row = False
+            target_row = []
+            source_row = OrderedDict({col: row[col] for col in src_col})
 
-            logging.info('Processing source row = {}'.format(row))
+            logging.info('Processing source row = {}'.format(source_row))
 
             print('Processing row {:,}'.format(row_cnt), end='\r')
 
             if add_uuid:
                 target_row.append(str(uuid.uuid4()))
 
-            for col_name, col_value in row.items():
+            for col_name, col_value in source_row.items():
                 logging.info('Processing column: {} = {}'
                              .format(col_name, col_value))
 
