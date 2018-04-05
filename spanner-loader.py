@@ -113,6 +113,7 @@ def load_file(instance_id,
 
         for row in reader:
             target_row = []
+            skip_row = False
 
             if add_uuid:
                 target_row.append(str(uuid.uuid4()))
@@ -121,10 +122,20 @@ def load_file(instance_id,
                 logging.info('Processing column: {} = {}'
                              .format(col_name, col_value))
 
-                target_row.append(apply_type[col_mapping[col_name]](col_value))
+                try:
+                    target_cell = apply_type[col_mapping[col_name]](col_value)
+                except ValueError as err:
+                    logging.warning(('Bad field detected: col = {}, value = {} '
+                                     'Skipping row...')
+                                    .format(col_name, col_value))
+                    skip_row = True
+                    break
+                else:
+                    target_row.append(target_cell)
 
-            row_batch.append(target_row)
-            row_cnt += 1
+            if not skip_row:
+                row_batch.append(target_row)
+                row_cnt += 1
 
             if row_cnt >= batchsize:
                 if not dry_run:
