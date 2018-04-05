@@ -79,6 +79,9 @@ def load_file(instance_id,
               project_id=None,
               path_to_credentials=None):
 
+    # Construct any arguments to be passed to the Spanner client init. These
+    # are optional since in cases when gcloud SDK is configured, or when
+    # pulling from instance metadata it is not necessary to manually specify
     client_args = {}
     if path_to_credentials:
         client_args['credentials'] = service_account.Credentials.from_service_account_file(path_to_credentials)
@@ -86,13 +89,22 @@ def load_file(instance_id,
     if project_id:
         client_args['project'] = project_id
 
+    # Build Spanner clients and set instance/database based on arguments
+    # TODO (djrut): Add exception handling
     spanner_client = spanner.Client(**client_args)
-
     instance = spanner_client.instance(instance_id)
     database = instance.database(database_id)
 
-    download_blob(bucket_name, file_name, 'source_file.gz')
+    # Generate a unique local temporary file name to allow multiple invocations
+    # of the tool from the same parent directory, and enable path to
+    # multi-threaded loader in future
+    local_file_name = ''.join(['.spanner_loader_tmp-', str(uuid.uuid4())])
 
+    # TODO (djrut): Add exception handling
+    download_blob(bucket_name, file_name, local_file_name)
+
+    # Figure out the source and target column names based on the schema file
+    # provided, and add a uuid if that option is enabled
     col_mapping = parse_schema(schema_file=schema_file)
 
     src_col = list(col_mapping.keys())
@@ -105,12 +117,13 @@ def load_file(instance_id,
     print('Detected {} columns in source schema: {}'
           .format(len(col_mapping), src_col))
 
-    with gzip.open("source_file.gz", "rt") as source_file:
+    with gzip.open(local_file_name, "rt") as source_file:
         reader = csv.DictReader(source_file,
                                 delimiter=delimiter,
                                 fieldnames=src_col)
         row_cnt = 0
         batch_cnt = 0
+        insert_cnt = 0
         row_batch = []
 
         for row in reader:
@@ -140,6 +153,7 @@ def load_file(instance_id,
             if not skip_row:
                 row_batch.append(target_row)
                 batch_cnt += 1
+                insert_cnt += 1
 
             if batch_cnt >= batchsize:
                 if not dry_run:
@@ -150,8 +164,8 @@ def load_file(instance_id,
                           values=row_batch
                       )
 
-                    print('Inserted {} rows into table {}'
-                          .format(batch_cnt, table_id))
+                    logging.info('Inserted {} rows into table {}'
+                                 .format(batch_cnt, table_id))
                 else:
                     print('Dry-run batch = {}'
                           .format(row_batch))
@@ -160,6 +174,9 @@ def load_file(instance_id,
                 row_batch = []
 
             row_cnt += 1
+
+        print('Load job complete for source file {}. Inserted {} of {} rows'
+              .format(file_name, insert_cnt, row_cnt))
 
 
 if __name__ == '__main__':
