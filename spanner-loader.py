@@ -129,7 +129,7 @@ def load_file(instance_id,
         for row in reader:
             skip_row = False
             target_row = []
-            source_row = OrderedDict({col: row[col] for col in src_col})
+            source_row = OrderedDict(((col, row[col]) for col in src_col))
 
             logging.info('Processing source row = {}'.format(source_row))
 
@@ -145,9 +145,10 @@ def load_file(instance_id,
                 try:
                     target_cell = apply_type[col_mapping[col_name]](col_value)
                 except ValueError as err:
-                    logging.warning(('Bad field detected: col = {}, value = {} '
+                    logging.warning(('Bad field detected in row {}: '
+                                     'col = {}, value = {} '
                                      'Skipping row...')
-                                    .format(col_name, col_value))
+                                    .format(row_cnt, col_name, col_value))
                     skip_row = True
                     break
                 else:
