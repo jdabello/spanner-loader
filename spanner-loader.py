@@ -5,6 +5,7 @@ import uuid
 import codecs
 import argparse
 import logging
+from collections import OrderedDict
 from google.oauth2 import service_account
 from google.cloud import storage, spanner
 
@@ -37,7 +38,7 @@ def parse_schema(schema_file):
     column name -> column type """
 
     with open(schema_file, 'r') as schema:
-        col_mapping = {}
+        col_mapping = OrderedDict()
         columns = schema.read().split(",")
         for column in columns:
             column = re.sub(r'[\n\t\s]*', '', column)
