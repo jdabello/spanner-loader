@@ -108,12 +108,15 @@ def load_file(instance_id,
         reader = csv.DictReader(source_file,
                                 delimiter=delimiter,
                                 fieldnames=src_col)
-        row_batch = []
         row_cnt = 0
+        batch_cnt = 0
+        row_batch = []
 
         for row in reader:
             target_row = []
             skip_row = False
+
+            print('Processing row {}'.format(row_cnt), end='\r')
 
             if add_uuid:
                 target_row.append(str(uuid.uuid4()))
@@ -135,9 +138,9 @@ def load_file(instance_id,
 
             if not skip_row:
                 row_batch.append(target_row)
-                row_cnt += 1
+                batch_cnt += 1
 
-            if row_cnt >= batchsize:
+            if batch_cnt >= batchsize:
                 if not dry_run:
                     with database.batch() as batch:
                       batch.insert(
@@ -147,13 +150,15 @@ def load_file(instance_id,
                       )
 
                     print('Inserted {} rows into table {}'
-                          .format(row_cnt, table_id))
+                          .format(batch_cnt, table_id))
                 else:
                     print('Dry-run batch = {}'
                           .format(row_batch))
 
-                row_cnt = 0
+                batch_cnt = 0
                 row_batch = []
+
+            row_cnt += 1
 
 
 if __name__ == '__main__':
