@@ -1,8 +1,10 @@
 import re
 import csv
 import gzip
+import uuid
 import codecs
 import argparse
+import logging
 from google.oauth2 import service_account
 from google.cloud import storage, spanner
 
@@ -69,6 +71,10 @@ def load_file(instance_id,
               file_name,
               schema_file,
               delimiter,
+              dry_run,
+              verbose,
+              debug,
+              add_uuid,
               project_id=None,
               path_to_credentials=None):
 
@@ -87,45 +93,91 @@ def load_file(instance_id,
     download_blob(bucket_name, file_name, 'source_file.gz')
 
     col_mapping = parse_schema(schema_file=schema_file)
-    col_list = col_mapping.keys()
 
-    print('Detected {} columns in schema: {}'
-          .format(len(col_mapping), col_list))
+    src_col = list(col_mapping.keys())
+
+    if add_uuid:
+        target_col = ['uuid'] + src_col
+    else:
+        target_col = src_col
+
+    print('Detected {} columns in source schema: {}'
+          .format(len(col_mapping), src_col))
 
     with gzip.open("source_file.gz", "rt") as source_file:
         reader = csv.DictReader(source_file,
                                 delimiter=delimiter,
-                                fieldnames=col_list)
+                                fieldnames=src_col)
         row_batch = []
         row_cnt = 0
 
         for row in reader:
             target_row = []
+
+            if add_uuid:
+                target_row.append(str(uuid.uuid4()))
+
             for col_name, col_value in row.items():
-                print('Processing column: {} = {}'
-                      .format(col_name, col_value))
+                logging.info('Processing column: {} = {}'
+                             .format(col_name, col_value))
+
                 target_row.append(apply_type[col_mapping[col_name]](col_value))
 
             row_batch.append(target_row)
             row_cnt += 1
 
             if row_cnt >= batchsize:
-                print(row_batch)
-                with database.batch() as batch:
-                  batch.insert(
-                      table=table_id,
-                      columns=col_list,
-                      values=row_batch
-                  )
-                print('inserted {} rows'.format(row_cnt))
+                if not dry_run:
+                    with database.batch() as batch:
+                      batch.insert(
+                          table=table_id,
+                          columns=target_col,
+                          values=row_batch
+                      )
+
+                    print('Inserted {} rows into table {}'
+                          .format(row_cnt, table_id))
+                else:
+                    print('Dry-run batch = {}'
+                          .format(row_batch))
+
                 row_cnt = 0
-                insert_rows = []
+                row_batch = []
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        description=('Spanner batch loader utility'))
+
+    parser.add_argument(
+        '-V',
+        '--verbose',
+        default=False,
+        action='store_true',
+        help='Enable verbose logging'
+    )
+
+    parser.add_argument(
+        '-D',
+        '--debug',
+        default=False,
+        action='store_true',
+        help='Enable debug logging'
+    )
+
+    parser.add_argument(
+        '--dry-run',
+        default=False,
+        action='store_true',
+        help='Perform dry-run without actually inserting rows'
+    )
+
+    parser.add_argument(
+        '--add-uuid',
+        default=False,
+        action='store_true',
+        help='Add a uuid column to target row'
+    )
 
     parser.add_argument(
         '--instance_id',
@@ -190,5 +242,23 @@ if __name__ == '__main__':
     )
 
     args = parser.parse_args().__dict__
+
+    # Setup logging levels based on verbosity setting
+    FORMAT = '%(levelname)s: [%(filename)s/%(funcName)s] %(message)s'
+    level = logging.WARNING
+
+    # Mute certain overly verbose modules
+    logging.getLogger("googleapiclient").setLevel(level)
+    logging.getLogger("oauth2client").setLevel(level)
+
+    if args['verbose']:
+        level = logging.INFO
+
+    if args['debug']:
+        level = logging.DEBUG
+        logging.getLogger("googleapiclient").setLevel(level)
+        logging.getLogger("oauth2client").setLevel(level)
+
+    logging.basicConfig(level=level, format=FORMAT)
 
     load_file(**args)
