@@ -64,6 +64,34 @@ def get_date(date_string):
     date_tmp = datetime.strptime(date_string, "%Y-%m-%d").date()
     return date_tmp
 
+def printProgressBar(iteration,
+                     total,
+                     prefix='',
+                     suffix='',
+                     decimals=1,
+                     length=100,
+                     fill= '█'):
+
+	""" https://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
+	Call in a loop to create terminal progress bar
+	@params:
+	iteration   - Required  : current iteration (Int)
+	total       - Required  : total iterations (Int)
+	prefix      - Optional  : prefix string (Str)
+	suffix      - Optional  : suffix string (Str)
+	decimals    - Optional  : positive number of decimals in percent complete (Int)
+	length      - Optional  : character length of bar (Int)
+	fill        - Optional  : bar fill character (Str)
+	"""
+	percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+	filledLength = int(length * iteration // total)
+	bar = fill * filledLength + '-' * (length - filledLength)
+	print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = '\r')
+
+	# Print New Line on Complete
+	if iteration == total:
+		print()
+
 def load_file(instance_id,
               database_id,
               table_id,
@@ -117,11 +145,29 @@ def load_file(instance_id,
     print('Detected {} columns in source schema: {}'
           .format(len(col_mapping), src_col))
 
+    # Determine total number of rows in source file. This is required to
+    # gracefully handle the terminal partial batch at the tail of file
+    print('Determining number of rows in source file {}...'
+          .format(file_name))
+
     with gzip.open(local_file_name, "rt") as source_file:
         reader = csv.DictReader(source_file,
                                 delimiter=delimiter,
                                 fieldnames=src_col)
-        row_cnt = 0
+
+        total_rows = sum(1 for row in reader)
+
+        print('Detected {:,} rows in source file: {}'
+              .format(total_rows, file_name))
+
+    # Re-initialize the row iterator, for reals this time
+    with gzip.open(local_file_name, "rt") as source_file:
+        reader = csv.DictReader(source_file,
+                                delimiter=delimiter,
+                                fieldnames=src_col)
+
+        # Initialize counter variables
+        row_cnt = 1
         batch_cnt = 0
         insert_cnt = 0
         row_batch = []
@@ -131,21 +177,22 @@ def load_file(instance_id,
             target_row = []
             source_row = OrderedDict(((col, row[col]) for col in src_col))
 
-            logging.info('Processing source row = {}'.format(source_row))
-
-            print('Processing row {:,}'.format(row_cnt), end='\r')
+            printProgressBar(row_cnt,
+                             total_rows,
+                             prefix='Rows loaded: {:,}/{:,}'
+                             .format(row_cnt, total_rows))
 
             if add_uuid:
                 target_row.append(str(uuid.uuid4()))
 
             for col_name, col_value in source_row.items():
-                logging.info('Processing column: {} = {}'
-                             .format(col_name, col_value))
+                logging.debug('Processing column: {} = {}'
+                              .format(col_name, col_value))
 
                 try:
                     target_cell = apply_type[col_mapping[col_name]](col_value)
                 except ValueError as err:
-                    logging.warning(('Bad field detected in row {}: '
+                    logging.warning(('Bad field detected in row {:,}: '
                                      'col = {}, value = {} '
                                      'Skipping row...')
                                     .format(row_cnt, col_name, col_value))
@@ -159,7 +206,7 @@ def load_file(instance_id,
                 batch_cnt += 1
                 insert_cnt += 1
 
-            if batch_cnt >= batchsize:
+            if (batch_cnt >= batchsize) or (row_cnt == total_rows):
                 if not dry_run:
                     with database.batch() as batch:
                       batch.insert(
@@ -177,7 +224,8 @@ def load_file(instance_id,
                 batch_cnt = 0
                 row_batch = []
 
-            row_cnt += 1
+            if row_cnt < total_rows:
+                row_cnt += 1
 
         print('Load job complete for source file {}. Inserted {} of {} rows'
               .format(file_name, insert_cnt, row_cnt))
