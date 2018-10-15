@@ -48,7 +48,7 @@ def parse_schema(schema_file):
     return col_mapping
 
 def get_timestamp_with_nanoseconds(timestamp_string):
-    from google.cloud.spanner_v1._helpers import TimestampWithNanoseconds
+    from google.api_core import datetime_helpers
     from datetime import datetime
 
     date_tmp = None
@@ -56,7 +56,7 @@ def get_timestamp_with_nanoseconds(timestamp_string):
         date_tmp = datetime.strptime(timestamp_string, '%Y-%m-%d %H:%M:%S.%f')
     else:
         date_tmp = datetime.strptime(timestamp_string, '%Y-%m-%d %H:%M:%S')
-    timestamp=TimestampWithNanoseconds(date_tmp.year, date_tmp.month, date_tmp.day, date_tmp.hour, date_tmp.minute, date_tmp.second, date_tmp.microsecond)
+    timestamp=datetime_helpers.DatetimeWithNanoseconds(date_tmp.year, date_tmp.month, date_tmp.day, date_tmp.hour, date_tmp.minute, date_tmp.second, date_tmp.microsecond)
     return timestamp
 
 def get_date(date_string):
